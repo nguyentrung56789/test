@@ -1,143 +1,6 @@
-<!doctype html>
-<html lang="vi">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Bản đồ Check-in KH</title>
-
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-  <!-- Supabase -->
-  <script src="./js/internal_key.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <style>
-    html,body{
-      margin:0; padding:0;
-      height:100%;
-      overflow:hidden;
-      font-family:system-ui;
-    }
-    #map{
-      position:fixed;
-      inset:0;
-      width:100%;
-      height:100%;
-    }
-
-    /* Bỏ nút + - */
-    .leaflet-control-zoom{
-      display:none !important;
-    }
-
-    /* Thanh điều khiển */
-    .top-controls{
-      position:fixed;
-      top:10px;
-      left:10px;
-      right:10px;
-      z-index:2000;
-      display:flex;
-      flex-direction:column;
-      gap:8px;
-    }
-
-    .row{
-      display:flex;
-      gap:8px;
-      width:100%;
-    }
-
-    .row select, #searchBox{
-      flex:1;
-      padding:6px 8px;
-      font-size:14px;
-      border-radius:8px;
-      border:1px solid #d1d5db;
-      background:white;
-    }
-
-    /* Nút GPS */
-    #gpsBtn{
-      width:40px;
-      height:40px;
-      border-radius:50%;
-      border:none;
-      background:white;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      box-shadow:0 4px 10px rgba(0,0,0,0.3);
-      font-size:20px;
-      cursor:pointer;
-      flex:0 0 40px;
-    }
-
-    /* Marker */
-    .mk-red,
-    .mk-orange,
-    .mk-purple,
-    .mk-green{
-      color:white;
-      width:26px;height:26px;
-      border-radius:50%;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      border:2px solid white;
-      font-weight:600;
-      font-size:12px;
-      box-shadow:0 0 0 1px rgba(0,0,0,0.3),0 4px 8px rgba(0,0,0,0.2);
-    }
-
-    .mk-red{
-      background:#ef4444;
-    }
-
-    .mk-orange{
-      background:#f59e0b;
-    }
-
-    .mk-purple{
-      background:#8b5cf6;
-    }
-
-    .mk-green{
-      background:#22c55e;
-    }
-  </style>
-</head>
-
-<body>
-
-<div class="top-controls">
-  <div class="row">
-    <button id="gpsBtn">📍</button>
-
-    <select id="colorFilter">
-      <option value="">Tất cả</option>
-      <option value="green">Xanh (có mua)</option>
-      <option value="red">Đỏ (không có số ĐT)</option>
-      <option value="orange">Cam (có số ĐT)</option>
-      <option value="purple">Tím (checkin_thang &gt; 0)</option>
-    </select>
-
-    <select id="nvFilter">
-      <option value="">Nhân viên</option>
-    </select>
-  </div>
-
-  <input id="searchBox" type="text" placeholder="Tìm kiếm KH...">
-</div>
-
-<div id="map"></div>
-
 <script>
 (async function(){
 
-  // ================== KẾT NỐI SUPABASE ==================
   const supabase = window.supabase.createClient(
     window.getConfig("url"),
     window.getConfig("role") || window.getConfig("anon"),
@@ -146,14 +9,12 @@
     }
   );
 
-  // ================== TẠO MAP ==================
   const map = L.map("map", { zoomControl:false }).setView([20.85,106.68], 12);
 
   L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",{
     maxZoom:19
   }).addTo(map);
 
-  // ================== HÀM PHỤ ==================
   function toNumber(v, fallback = 0){
     if (v === null || v === undefined || v === "") return fallback;
     const n = Number(v);
@@ -168,20 +29,14 @@
     const hasPhone = normalizePhone(row.dien_thoai) !== "";
     const checkinMonth = toNumber(row.checkin_thang, 0);
 
-    // Ưu tiên cao nhất
     if (checkinMonth > 0) return "purple";
-
     if (hasPhone) return "orange";
-
-    if (row.Da_mua_hang) return "green";
-
     return "red";
   }
 
   function getMarkerClass(color){
     if (color === "purple") return "mk-purple";
     if (color === "orange") return "mk-orange";
-    if (color === "green") return "mk-green";
     return "mk-red";
   }
 
@@ -191,7 +46,6 @@
     return index + 1;
   }
 
-  // ================== LẤY KH ==================
   async function fetchAllRows() {
     const pageSize = 1000;
     let from = 0;
@@ -200,10 +54,15 @@
     while (true) {
       const { data, error } = await supabase
         .from("nv_checkin_khach_hang")
-        .select("lat,lng,ten_kh,ma_kh,dia_chi,dien_thoai,ma_nv,Da_mua_hang,nhan_vien,nv_quanly,checkin_thang,checkin_all")
+        .select("lat,lng,ten_kh,ma_kh,dia_chi,dien_thoai,ma_nv,checkin_thang")
         .range(from, from + pageSize - 1);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Lỗi Supabase:", error);
+        alert("Lỗi lấy dữ liệu Supabase: " + (error.message || "Không rõ lỗi"));
+        return [];
+      }
+
       if (!data || data.length === 0) break;
 
       allRows = allRows.concat(data);
@@ -217,6 +76,7 @@
 
   const data = await fetchAllRows();
   console.log("Tổng rows lấy được:", data.length);
+  console.log("Mẫu row đầu:", data[0]);
 
   let points = [];
   let markers = [];
@@ -224,13 +84,15 @@
   data.forEach((r,i)=>{
     const lat = parseFloat(String(r.lat ?? "").trim());
     const lng = parseFloat(String(r.lng ?? "").trim());
-    if(!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      console.log("Bỏ row do lat/lng lỗi:", r);
+      return;
+    }
 
     const color = getColor(r);
     const markerClass = getMarkerClass(color);
     const label = getMarkerLabel(r, i);
-    const hasPhone = normalizePhone(r.dien_thoai) !== "";
-    const checkinMonth = toNumber(r.checkin_thang, 0);
 
     const icon = L.divIcon({
       html:`<div class="${markerClass}">${label}</div>`,
@@ -244,15 +106,8 @@
       Mã KH: ${r.ma_kh || ""}<br>
       Địa chỉ: ${r.dia_chi || ""}<br>
       ĐT: ${r.dien_thoai || ""}<br>
-      NV: ${r.ma_nv || r.nhan_vien || ""}<br>
-      Checkin tháng: <b>${checkinMonth}</b><br>
-      Checkin all: <b>${toNumber(r.checkin_all, 0)}</b><br>
-      Trạng thái màu: <b>${
-        checkinMonth > 0 ? "Tím" :
-        hasPhone ? "Cam" :
-        "Đỏ"
-      }</b><br>
-      Đã mua: <b>${r.Da_mua_hang ? "✔ Có" : "✘ Không"}</b>
+      NV: ${r.ma_nv || ""}<br>
+      Checkin tháng: <b>${toNumber(r.checkin_thang, 0)}</b>
     `);
 
     mk.addTo(map);
@@ -261,21 +116,22 @@
       stt: i + 1,
       lat,
       lng,
-      marker:mk,
+      marker: mk,
       color,
-      nv:(r.ma_nv || r.nhan_vien || "").trim(),
-      row:r
+      nv: String(r.ma_nv || "").trim(),
+      row: r
     });
 
     markers.push(mk);
   });
+
+  console.log("Số marker vẽ được:", markers.length);
 
   if(markers.length){
     const grp = L.featureGroup(markers);
     map.fitBounds(grp.getBounds(),{padding:[50,50]});
   }
 
-  // ================== GPS ==================
   let userMarker = null;
   let userCircle = null;
   let lastLat = null;
@@ -314,15 +170,12 @@
     navigator.geolocation.getCurrentPosition(pos=>{
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
-
       showGPS(lat,lng);
       map.setView([lat,lng],18);
     });
 
     navigator.geolocation.watchPosition(
-      pos=>{
-        showGPS(pos.coords.latitude, pos.coords.longitude);
-      },
+      pos=> showGPS(pos.coords.latitude, pos.coords.longitude),
       undefined,
       { enableHighAccuracy:true, timeout:3000, maximumAge:0 }
     );
@@ -334,7 +187,6 @@
     }
   };
 
-  // ================== DROPDOWN LỌC NV ==================
   const nvFilter = document.getElementById("nvFilter");
   const nvSet = new Set();
 
@@ -353,7 +205,6 @@
     nvFilter.appendChild(opt);
   });
 
-  // ================== LỌC (MÀU + NHÂN VIÊN + TÌM KIẾM) ==================
   const colorFilter = document.getElementById("colorFilter");
   const searchBox   = document.getElementById("searchBox");
 
@@ -379,12 +230,7 @@
           ${r.ten_kh || ""}
           ${r.dia_chi || ""}
           ${r.dien_thoai || ""}
-          ${r.ghi_chu || ""}
           ${r.ma_nv || ""}
-          ${r.nhan_vien || ""}
-          ${r.nv_quanly || ""}
-          ${r.checkin_thang || ""}
-          ${r.checkin_all || ""}
         `.toLowerCase();
 
         if(!text.includes(q)) ok = false;
@@ -396,11 +242,6 @@
         if(map.hasLayer(p.marker)) map.removeLayer(p.marker);
       }
     });
-
-    const remain = points.filter(p => map.hasLayer(p.marker));
-    if(remain.length === 1){
-      map.setView([remain[0].lat, remain[0].lng], 18);
-    }
   }
 
   colorFilter.onchange = applyFilter;
@@ -409,6 +250,3 @@
 
 })();
 </script>
-
-</body>
-</html>
