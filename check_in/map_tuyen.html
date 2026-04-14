@@ -108,12 +108,14 @@
   <div class="row">
     <button id="gpsBtn">📍</button>
 
-    <select id="levelFilter">
-      <option value="">Tất cả</option>
-      <option value="1">1 màu đỏ check in về (chưa có số đt)</option>
-      <option value="2">2 màu cam (đã check in có đt)</option>
-      <option value="3">3 màu tím (nv đã checkin ở tháng này)</option>
-    </select>
+<select id="levelFilter">
+  <option value="">Tất cả</option>
+  <option value="1">1 màu đỏ check in về (chưa có số đt)</option>
+  <option value="2">2 màu cam (đã check in có đt)</option>
+  <option value="3">3 màu tím (nv đã checkin ở tháng này)</option>
+  <option value="buy">Khách đã mua hàng</option>
+  <option value="nobuy">Khách chưa mua hàng</option>
+</select>
 
     <select id="nvFilter">
       <option value="">Nhân viên</option>
@@ -243,16 +245,17 @@
 
     mk.addTo(map);
 
-    points.push({
-      stt,
-      lat,
-      lng,
-      marker:mk,
-      color,
-      level,
-      nv:r.ma_nv || "",
-      row:r
-    });
+points.push({
+  stt,
+  lat,
+  lng,
+  marker:mk,
+  color,
+  level,
+  bought: !!r.Da_mua_hang,
+  nv:r.ma_nv || "",
+  row:r
+});
     markers.push(mk);
   });
 
@@ -340,48 +343,62 @@
   const levelFilter = document.getElementById("levelFilter");
   const searchBox   = document.getElementById("searchBox");
 
-  function applyFilter(){
-    const fLevel = levelFilter.value;
-    const fNV    = nvFilter.value;
-    const q      = searchBox.value.trim().toLowerCase();
+function applyFilter(){
+  const fLevel = levelFilter.value;
+  const fNV    = nvFilter.value;
+  const q      = searchBox.value.trim().toLowerCase();
 
-    points.forEach(p=>{
-      const r = p.row;
-      let ok = true;
+  points.forEach(p=>{
+    const r = p.row;
+    let ok = true;
 
-      if(fLevel && p.level !== fLevel) ok = false;
-
-      if(fNV){
-        const nvList = (p.nv || "").split("_").map(x=>x.trim()).filter(Boolean);
-        if(!nvList.includes(fNV)) ok = false;
-      }
-
-      if(q){
-        const text = `
-          ${r.ma_kh || ""}
-          ${r.ten_kh || ""}
-          ${r.dia_chi || ""}
-          ${r.dien_thoai || ""}
-          ${r.ghi_chu || ""}
-          ${r.ma_nv || ""}
-          ${r.checkin_thang || ""}
-        `.toLowerCase();
-
-        if(!text.includes(q)) ok = false;
-      }
-
-      if(ok){
-        if(!map.hasLayer(p.marker)) p.marker.addTo(map);
-      }else{
-        if(map.hasLayer(p.marker)) map.removeLayer(p.marker);
-      }
-    });
-
-    const remain = points.filter(p => map.hasLayer(p.marker));
-    if(remain.length === 1){
-      map.setView([remain[0].lat, remain[0].lng], 18);
+    // Lọc theo dropdown chính
+    if (fLevel === "1" || fLevel === "2" || fLevel === "3") {
+      if (p.level !== fLevel) ok = false;
     }
+
+    if (fLevel === "buy") {
+      if (!p.bought) ok = false;
+    }
+
+    if (fLevel === "nobuy") {
+      if (p.bought) ok = false;
+    }
+
+    // Lọc nhân viên
+    if(fNV){
+      const nvList = (p.nv || "").split("_").map(x=>x.trim()).filter(Boolean);
+      if(!nvList.includes(fNV)) ok = false;
+    }
+
+    // Lọc tìm kiếm
+    if(q){
+      const text = `
+        ${r.ma_kh || ""}
+        ${r.ten_kh || ""}
+        ${r.dia_chi || ""}
+        ${r.dien_thoai || ""}
+        ${r.ghi_chu || ""}
+        ${r.ma_nv || ""}
+        ${r.checkin_thang || ""}
+        ${r.Da_mua_hang ? "da mua hang" : "chua mua hang"}
+      `.toLowerCase();
+
+      if(!text.includes(q)) ok = false;
+    }
+
+    if(ok){
+      if(!map.hasLayer(p.marker)) p.marker.addTo(map);
+    }else{
+      if(map.hasLayer(p.marker)) map.removeLayer(p.marker);
+    }
+  });
+
+  const remain = points.filter(p => map.hasLayer(p.marker));
+  if(remain.length === 1){
+    map.setView([remain[0].lat, remain[0].lng], 18);
   }
+}
 
   levelFilter.onchange = applyFilter;
   nvFilter.onchange    = applyFilter;
