@@ -27,12 +27,10 @@
       height:100%;
     }
 
-    /* Bỏ nút + - */
     .leaflet-control-zoom{
       display:none !important;
     }
 
-    /* Thanh điều khiển */
     .top-controls{
       position:fixed;
       top:10px;
@@ -59,7 +57,6 @@
       background:white;
     }
 
-    /* Nút GPS */
     #gpsBtn{
       width:40px;
       height:40px;
@@ -72,9 +69,9 @@
       box-shadow:0 4px 10px rgba(0,0,0,0.3);
       font-size:20px;
       cursor:pointer;
+      flex:0 0 40px;
     }
 
-    /* Marker màu */
     .mk-red,
     .mk-orange,
     .mk-purple{
@@ -107,18 +104,15 @@
 
 <body>
 
-<!-- ====== THANH LỌC ====== -->
 <div class="top-controls">
-
-  <!-- HÀNG 1: GPS + LỌC MÀU + LỌC NHÂN VIÊN -->
   <div class="row">
     <button id="gpsBtn">📍</button>
 
-    <select id="colorFilter">
+    <select id="levelFilter">
       <option value="">Tất cả</option>
-      <option value="red">Đỏ (không có số ĐT)</option>
-      <option value="orange">Cam (có số ĐT)</option>
-      <option value="purple">Tím (checkin_thang > 0)</option>
+      <option value="1">1 màu đỏ check in về (chưa có số đt)</option>
+      <option value="2">2 màu cam (đã check in có đt)</option>
+      <option value="3">3 màu tím (nv đã checkin ở tháng này)</option>
     </select>
 
     <select id="nvFilter">
@@ -126,9 +120,7 @@
     </select>
   </div>
 
-  <!-- HÀNG 2: Ô TÌM KIẾM -->
   <input id="searchBox" type="text" placeholder="Tìm kiếm KH...">
-
 </div>
 
 <div id="map"></div>
@@ -136,7 +128,6 @@
 <script>
 (async function(){
 
-  // ================== KẾT NỐI SUPABASE ==================
   const supabase = window.supabase.createClient(
     window.getConfig("url"),
     window.getConfig("role") || window.getConfig("anon"),
@@ -145,7 +136,6 @@
     }
   );
 
-  // ================== TẠO MAP ==================
   const map = L.map("map", { zoomControl:false }).setView([20.85,106.68], 12);
 
   L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",{
@@ -162,12 +152,19 @@
     return String(v || "").replace(/\D/g, "").trim();
   }
 
-  function getColor(row){
+  function getLevel(row){
     const hasPhone = normalizePhone(row.dien_thoai) !== "";
     const checkinMonth = toNumber(row.checkin_thang, 0);
 
-    if (checkinMonth > 0) return "purple";
-    if (hasPhone) return "orange";
+    if (checkinMonth > 0) return "3";
+    if (hasPhone) return "2";
+    return "1";
+  }
+
+  function getColor(row){
+    const level = getLevel(row);
+    if (level === "3") return "purple";
+    if (level === "2") return "orange";
     return "red";
   }
 
@@ -183,7 +180,6 @@
     return index + 1;
   }
 
-  // ================== LẤY KH ==================
   async function fetchAllRows() {
     const pageSize = 1000;
     let from = 0;
@@ -219,6 +215,7 @@
     if(!Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
     const stt = getMarkerLabel(r, i);
+    const level = getLevel(r);
     const color = getColor(r);
     const markerClass = getMarkerClass(color);
 
@@ -236,6 +233,7 @@
       ĐT: ${r.dien_thoai || ""}<br>
       NV: ${r.ma_nv || ""}<br>
       Checkin tháng: <b>${toNumber(r.checkin_thang, 0)}</b><br>
+      Cấp độ: <b>${level}</b><br>
       Màu: <b>${
         color === "purple" ? "Tím" :
         color === "orange" ? "Cam" :
@@ -250,7 +248,8 @@
       lat,
       lng,
       marker:mk,
-      color:color,
+      color,
+      level,
       nv:r.ma_nv || "",
       row:r
     });
@@ -262,7 +261,6 @@
     map.fitBounds(grp.getBounds(),{padding:[50,50]});
   }
 
-  // ================== GPS ==================
   let userMarker = null;
   let userCircle = null;
   let lastLat = null;
@@ -321,13 +319,15 @@
     }
   };
 
-  // ================== DROPDOWN LỌC NV ==================
   const nvFilter = document.getElementById("nvFilter");
   const nvSet = new Set();
 
   points.forEach(p=>{
     if(!p.nv) return;
-    p.nv.split("_").forEach(nv => nvSet.add(nv.trim()));
+    p.nv.split("_").forEach(nv => {
+      const x = nv.trim();
+      if (x) nvSet.add(x);
+    });
   });
 
   [...nvSet].sort().forEach(nv=>{
@@ -337,12 +337,11 @@
     nvFilter.appendChild(opt);
   });
 
-  // ================== LỌC (MÀU + NHÂN VIÊN + TÌM KIẾM) ==================
-  const colorFilter = document.getElementById("colorFilter");
+  const levelFilter = document.getElementById("levelFilter");
   const searchBox   = document.getElementById("searchBox");
 
   function applyFilter(){
-    const fColor = colorFilter.value;
+    const fLevel = levelFilter.value;
     const fNV    = nvFilter.value;
     const q      = searchBox.value.trim().toLowerCase();
 
@@ -350,16 +349,13 @@
       const r = p.row;
       let ok = true;
 
-      // Lọc màu
-      if(fColor && p.color !== fColor) ok = false;
+      if(fLevel && p.level !== fLevel) ok = false;
 
-      // Lọc nhân viên (tách theo "_")
       if(fNV){
         const nvList = (p.nv || "").split("_").map(x=>x.trim()).filter(Boolean);
         if(!nvList.includes(fNV)) ok = false;
       }
 
-      // Lọc theo từ khoá
       if(q){
         const text = `
           ${r.ma_kh || ""}
@@ -374,7 +370,6 @@
         if(!text.includes(q)) ok = false;
       }
 
-      // Hiện / ẩn marker
       if(ok){
         if(!map.hasLayer(p.marker)) p.marker.addTo(map);
       }else{
@@ -382,14 +377,13 @@
       }
     });
 
-    // Nếu chỉ còn 1 điểm sau khi lọc → zoom sát
     const remain = points.filter(p => map.hasLayer(p.marker));
     if(remain.length === 1){
       map.setView([remain[0].lat, remain[0].lng], 18);
     }
   }
 
-  colorFilter.onchange = applyFilter;
+  levelFilter.onchange = applyFilter;
   nvFilter.onchange    = applyFilter;
   searchBox.oninput    = applyFilter;
 
