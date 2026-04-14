@@ -253,7 +253,8 @@ points.push({
   color,
   level,
   bought: !!r.Da_mua_hang,
-  nv:r.ma_nv || "",
+  nv: String(r.ma_nv || "").trim(),
+  nvName: String(r.nhan_vien || "").trim(),
   row:r
 });
     markers.push(mk);
@@ -322,23 +323,29 @@ points.push({
     }
   };
 
-  const nvFilter = document.getElementById("nvFilter");
-  const nvSet = new Set();
+const nvFilter = document.getElementById("nvFilter");
+const nvMap = new Map();
 
-  points.forEach(p=>{
-    if(!p.nv) return;
-    p.nv.split("_").forEach(nv => {
-      const x = nv.trim();
-      if (x) nvSet.add(x);
-    });
-  });
+points.forEach(p => {
+  if (!p.nv) return;
 
-  [...nvSet].sort().forEach(nv=>{
-    const opt=document.createElement("option");
-    opt.value=nv;
-    opt.textContent=nv;
-    nvFilter.appendChild(opt);
+  const codeList = String(p.nv).split("_").map(x => x.trim()).filter(Boolean);
+  const nameList = String(p.nvName || "").split("_").map(x => x.trim());
+
+  codeList.forEach((code, idx) => {
+    if (!nvMap.has(code)) {
+      const name = nameList[idx] || "";
+      nvMap.set(code, name ? `${code} - ${name}` : code);
+    }
   });
+});
+
+[...nvMap.entries()].sort((a, b) => a[1].localeCompare(b[1], "vi")).forEach(([code, label]) => {
+  const opt = document.createElement("option");
+  opt.value = code;        // lọc vẫn theo mã
+  opt.textContent = label; // hiện mã - tên
+  nvFilter.appendChild(opt);
+});
 
   const levelFilter = document.getElementById("levelFilter");
   const searchBox   = document.getElementById("searchBox");
