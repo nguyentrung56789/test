@@ -340,12 +340,14 @@ points.forEach(p => {
   });
 });
 
-[...nvMap.entries()].sort((a, b) => a[1].localeCompare(b[1], "vi")).forEach(([code, label]) => {
-  const opt = document.createElement("option");
-  opt.value = code;        // lọc vẫn theo mã
-  opt.textContent = label; // hiện mã - tên
-  nvFilter.appendChild(opt);
-});
+[...nvMap.entries()]
+  .sort((a, b) => a[1].localeCompare(b[1], "vi"))
+  .forEach(([code, label]) => {
+    const opt = document.createElement("option");
+    opt.value = code;
+    opt.textContent = label;
+    nvFilter.appendChild(opt);
+  });
 
   const levelFilter = document.getElementById("levelFilter");
   const searchBox   = document.getElementById("searchBox");
