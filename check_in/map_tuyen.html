@@ -249,12 +249,13 @@ points.push({
   stt,
   lat,
   lng,
-  marker:mk,
+  marker: mk,
   color,
   level,
-  bought: !!r.Da_mua_hang,
-  nv:r.ma_nv || "",
-  row:r
+  nvCode: String(r.ma_nv || "").trim(),
+  nvName: String(r.nhan_vien || "").trim(),
+  nvPhone: String(r.dien_thoai || "").trim(),
+  row: r
 });
     markers.push(mk);
   });
@@ -322,21 +323,24 @@ points.push({
     }
   };
 
-  const nvFilter = document.getElementById("nvFilter");
-  const nvSet = new Set();
+const nvFilter = document.getElementById("nvFilter");
+const nvMap = new Map();
 
-  points.forEach(p=>{
-    if(!p.nv) return;
-    p.nv.split("_").forEach(nv => {
-      const x = nv.trim();
-      if (x) nvSet.add(x);
-    });
-  });
+points.forEach(p => {
+  if (!p.nvCode) return;
 
-  [...nvSet].sort().forEach(nv=>{
-    const opt=document.createElement("option");
-    opt.value=nv;
-    opt.textContent=nv;
+  if (!nvMap.has(p.nvCode)) {
+    const label = [p.nvPhone, p.nvName].filter(Boolean).join(" - ") || p.nvCode;
+    nvMap.set(p.nvCode, label);
+  }
+});
+
+[...nvMap.entries()]
+  .sort((a, b) => a[1].localeCompare(b[1], "vi"))
+  .forEach(([code, label]) => {
+    const opt = document.createElement("option");
+    opt.value = code;        // lọc bằng mã
+    opt.textContent = label; // hiện số đt + tên
     nvFilter.appendChild(opt);
   });
 
